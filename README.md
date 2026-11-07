@@ -139,12 +139,62 @@ Winmetic also bundles a standalone CLI (`winmetic.exe`) for running tests on hid
 # Run any executable on an isolated hidden desktop station:
 winmetic run ./build/Release/my_tests.exe --arg1 --arg2
 
+# Diagnose your system's Windows Sandbox readiness:
+winmetic sandbox doctor
+
 # Generate a disposable Windows Sandbox profile (.wsb) mapping your workspace:
 winmetic sandbox gen --map M:\repos\my-app --out test-sandbox.wsb
 
 # Launch the sandbox profile:
 winmetic sandbox launch test-sandbox.wsb
 ```
+
+---
+
+## Troubleshooting & Windows Sandbox Pitfalls
+
+> **Important Recommendation:** For 99% of UI test automation workflows, **use Winmetic Tier 1 (Platform Seam) and Tier 2 (Hidden Desktop)** via `winmetic run`. They run natively on **every** Windows edition (including Windows 10/11 Home) with zero hypervisor dependencies, sub-millisecond startup, and complete immunity to the container issues detailed below.
+
+If you specifically use **Tier 3 (Windows Sandbox)**, here are the common Windows platform issues and their resolutions:
+
+### 1. `0x80040154 (REGDB_E_CLASSNOTREG)`
+* **Symptom:** Windows Sandbox shows *"Windows Sandbox failed to initialize. Class not registered (0x80040154)"*.
+* **Root Cause:** 
+  1. Hardware Virtualization (Intel VT-x / AMD SVM) is disabled in your motherboard's BIOS/UEFI.
+  2. The Hyper-V Host Compute Service (`vmcompute`) is stopped or not registered.
+* **Resolution:**
+  * Run `winmetic sandbox doctor` to diagnose.
+  * Enter your BIOS/UEFI settings and enable **SVM Mode** (AMD) or **Intel Virtualization Technology (VT-x)**.
+  * Ensure the Hyper-V Host Compute service is running: `net start vmcompute`.
+
+### 2. `Feature name Containers-DisposableClientVM is unknown`
+* **Symptom:** Running `Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM` fails.
+* **Root Cause:** You are running **Windows 10/11 Home edition**. Microsoft officially restricts the Windows Sandbox optional feature to Windows Pro, Enterprise, and Education editions.
+* **Resolution:**
+  * Stick to Winmetic Tiers 1 & 2 (`winmetic run`), which work 100% natively on Windows Home without Hyper-V.
+  * Or, stage the container packages from `C:\Windows\servicing\Packages` via `winmetic sandbox setup --home`.
+
+### 3. `0x80070534 (No mapping between account names and security IDs was done)`
+* **Symptom:** Windows Sandbox crashes during container logon with error `0x80070534`.
+* **Root Cause:** Windows Sandbox uses a dedicated virtual service account named `WDAGUtilityAccount`. If this account is disabled, missing from the local `Users` group, or lacks NTFS ACL permissions on a mapped host folder (especially on secondary drives like `D:\` or `M:\`), SID translation fails.
+* **Resolution:**
+  * Enable and map the account:
+    ```cmd
+    net user WDAGUtilityAccount /active:yes
+    net localgroup Users WDAGUtilityAccount /add
+    ```
+  * Grant access to mapped host directories:
+    ```cmd
+    icacls "M:\path\to\your\repo" /grant "WDAGUtilityAccount:(OI)(CI)F"
+    ```
+
+### 4. `Exception of type 'System.Exception' was thrown`
+* **Symptom:** Launching a `.wsb` profile shows a generic .NET `System.Exception`.
+* **Root Cause:**
+  1. The Hyper-V Virtual Switch (vSwitch) or Host Networking Service (HNS) failed to initialize (common on Windows Home editions where the container networking driver is stripped).
+  2. A local VPN, firewall, or system proxy client is conflicting with the Sandbox virtual network adapter bridge (`<Networking>Enable</Networking>`).
+  3. XML formatting errors in the `.wsb` file (e.g. unescaped quotes inside `<Command>`).
+* **Resolution:** Disable third-party VPNs/proxies, or set `<Networking>Disable</Networking>` in the `.wsb` configuration.
 
 ---
 
