@@ -156,14 +156,23 @@ int main(int argc, char* argv[]) {
 
         if (argc >= 3 && std::string(argv[2]) == "setup") {
             bool for_home = (argc >= 4 && std::string(argv[3]) == "--home");
-            std::cout << "[winmetic] Requesting administrator privileges to install Windows Sandbox feature"
-                      << (for_home ? " (Windows Home Mode)..." : "...") << "\n";
+            bool fix_accounts = (argc >= 4 && std::string(argv[3]) == "--fix-accounts");
+
+            std::cout << "[winmetic] Requesting administrator privileges to configure Windows Sandbox"
+                      << (fix_accounts ? " (Repairing WDAGUtilityAccount SID mappings)..." : (for_home ? " (Windows Home Mode)..." : "...")) << "\n";
 
             std::wstring ps_cmd;
-            if (for_home) {
+            if (fix_accounts) {
+                ps_cmd = L"-NoExit -Command \"Write-Host 'Enabling and mapping WDAGUtilityAccount for Windows Sandbox...' -ForegroundColor Yellow; "
+                         L"net user WDAGUtilityAccount /active:yes; "
+                         L"net localgroup Users WDAGUtilityAccount /add; "
+                         L"Write-Host 'Account mapped successfully! Try launching Windows Sandbox now.' -ForegroundColor Green\"";
+            } else if (for_home) {
                 ps_cmd = L"-NoExit -Command \"Write-Host 'Staging Container packages on Windows Home via DISM...' -ForegroundColor Yellow; "
                          L"Get-ChildItem -Path $env:SystemRoot\\servicing\\Packages\\*Containers*.mum | ForEach-Object { & dism.exe /online /norestart /add-package:$($_.FullName) }; "
                          L"& dism.exe /online /enable-feature /featurename:Containers-DisposableClientVM /LimitAccess /ALL; "
+                         L"net user WDAGUtilityAccount /active:yes; "
+                         L"net localgroup Users WDAGUtilityAccount /add; "
                          L"Write-Host 'Installation finished! Please restart your PC.' -ForegroundColor Green\"";
             } else {
                 ps_cmd = L"-NoExit -Command \"Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All; "
