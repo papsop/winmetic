@@ -105,6 +105,17 @@ inline SandboxDoctorResult check_sandbox_readiness() {
         DWORD size = sizeof(prod_name);
         if (RegQueryValueExW(hkey, L"ProductName", nullptr, nullptr, reinterpret_cast<LPBYTE>(prod_name), &size) == ERROR_SUCCESS) {
             std::wstring wname(prod_name);
+
+            // Windows 11 still reports 'Windows 10' in ProductName; correct via CurrentBuildNumber
+            wchar_t build_str[64]{};
+            DWORD bsize = sizeof(build_str);
+            if (RegQueryValueExW(hkey, L"CurrentBuildNumber", nullptr, nullptr, reinterpret_cast<LPBYTE>(build_str), &bsize) == ERROR_SUCCESS) {
+                if (_wtoi(build_str) >= 22000 && wname.find(L"Windows 10") != std::wstring::npos) {
+                    size_t pos = wname.find(L"Windows 10");
+                    wname.replace(pos, 10, L"Windows 11");
+                }
+            }
+
             int len = WideCharToMultiByte(CP_UTF8, 0, wname.data(), static_cast<int>(wname.size()), nullptr, 0, nullptr, nullptr);
             res.windows_edition.assign(len, 0);
             WideCharToMultiByte(CP_UTF8, 0, wname.data(), static_cast<int>(wname.size()), res.windows_edition.data(), len, nullptr, nullptr);

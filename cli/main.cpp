@@ -27,6 +27,9 @@ void print_help() {
 }
 
 int main(int argc, char* argv[]) {
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+
     if (argc < 2) {
         print_help();
         return 0;
@@ -115,13 +118,13 @@ int main(int argc, char* argv[]) {
                       << report.windows_edition << (report.is_windows_home ? " (Home - Sandbox not officially enabled by default)" : " (Pro/Enterprise)") << "\n";
 
             std::cout << "[2] Hardware Virtualization (BIOS):    "
-                      << (report.virtualization_firmware_enabled ? "✓ Enabled" : "✗ Disabled in BIOS/UEFI") << "\n";
+                      << (report.virtualization_firmware_enabled ? "[OK] Enabled" : "[FAIL] Disabled in BIOS/UEFI") << "\n";
 
             std::cout << "[3] Hyper-V Host Compute (vmcompute):  "
-                      << (report.vmcompute_installed ? (report.vmcompute_running ? "✓ Running" : "⚠ Installed (Stopped)") : "✗ NOT Installed") << "\n";
+                      << (report.vmcompute_installed ? (report.vmcompute_running ? "[OK] Running" : "[WARN] Installed (Stopped)") : "[FAIL] NOT Installed") << "\n";
 
             std::cout << "[4] WindowsSandbox.exe:                "
-                      << (report.sandbox_exe_found ? ("✓ Found (" + report.sandbox_exe_path + ")") : "✗ Missing") << "\n";
+                      << (report.sandbox_exe_found ? ("[OK] Found (" + report.sandbox_exe_path + ")") : "[FAIL] Missing") << "\n";
 
             if (report.is_ready()) {
                 std::cout << "\nStatus: Windows Sandbox is ready for container testing!\n";
