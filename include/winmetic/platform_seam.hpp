@@ -121,7 +121,7 @@ public:
   HiddenDesktopScope()
   {
     original_desktop_ = GetThreadDesktop(GetCurrentThreadId());
-    desktop_ = CreateDesktopW(L"AtlasTestDesktop", nullptr, nullptr, 0, GENERIC_ALL, nullptr);
+    desktop_ = CreateDesktopW(L"WinmeticTestDesktop", nullptr, nullptr, 0, GENERIC_ALL, nullptr);
     if (desktop_)
     {
       SetThreadDesktop(desktop_);

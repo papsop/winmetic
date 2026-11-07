@@ -6,8 +6,28 @@
 #include <fstream>
 #include <filesystem>
 #include <cstdlib>
+#include <cstdint>
+#include <windows.h>
+#include <shellapi.h>
 
 namespace winmetic {
+
+/// Escapes text for use inside XML element content.
+inline std::string xml_escape(const std::string& in) {
+    std::string out;
+    out.reserve(in.size());
+    for (char c : in) {
+        switch (c) {
+            case '&': out += "&amp;"; break;
+            case '<': out += "&lt;"; break;
+            case '>': out += "&gt;"; break;
+            case '"': out += "&quot;"; break;
+            case '\'': out += "&apos;"; break;
+            default: out += c;
+        }
+    }
+    return out;
+}
 
 struct MappedFolder {
     std::string host_folder;
@@ -46,9 +66,9 @@ struct SandboxConfig {
             ss << "  <MappedFolders>\n";
             for (const auto& folder : mapped_folders) {
                 ss << "    <MappedFolder>\n";
-                ss << "      <HostFolder>" << folder.host_folder << "</HostFolder>\n";
+                ss << "      <HostFolder>" << xml_escape(folder.host_folder) << "</HostFolder>\n";
                 if (!folder.sandbox_folder.empty()) {
-                    ss << "      <SandboxFolder>" << folder.sandbox_folder << "</SandboxFolder>\n";
+                    ss << "      <SandboxFolder>" << xml_escape(folder.sandbox_folder) << "</SandboxFolder>\n";
                 }
                 ss << "      <ReadOnly>" << (folder.read_only ? "true" : "false") << "</ReadOnly>\n";
                 ss << "    </MappedFolder>\n";
@@ -58,7 +78,7 @@ struct SandboxConfig {
 
         if (!logon_command.empty()) {
             ss << "  <LogonCommand>\n";
-            ss << "    <Command>" << logon_command << "</Command>\n";
+            ss << "    <Command>" << xml_escape(logon_command) << "</Command>\n";
             ss << "  </LogonCommand>\n";
         }
 
@@ -162,8 +182,10 @@ inline SandboxDoctorResult check_sandbox_readiness() {
  * @brief Launches a .wsb file using the Windows Sandbox executable.
  */
 inline bool launch_sandbox(const std::filesystem::path& wsb_path) {
-    std::string cmd = "start \"\" \"" + wsb_path.string() + "\"";
-    return std::system(cmd.c_str()) == 0;
+    // ShellExecute opens the .wsb via its file association; no shell is involved,
+    // so the path cannot inject commands.
+    HINSTANCE res = ShellExecuteW(nullptr, L"open", wsb_path.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+    return reinterpret_cast<INT_PTR>(res) > 32;
 }
 
 } // namespace winmetic
