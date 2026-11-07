@@ -111,13 +111,16 @@ int main(int argc, char* argv[]) {
             std::cout << "=== Winmetic Sandbox Doctor ===\n";
             auto report = winmetic::check_sandbox_readiness();
 
-            std::cout << "[1] Hardware Virtualization (BIOS):    "
+            std::cout << "[1] Windows Edition:                   "
+                      << report.windows_edition << (report.is_windows_home ? " (Home - Sandbox not officially enabled by default)" : " (Pro/Enterprise)") << "\n";
+
+            std::cout << "[2] Hardware Virtualization (BIOS):    "
                       << (report.virtualization_firmware_enabled ? "✓ Enabled" : "✗ Disabled in BIOS/UEFI") << "\n";
 
-            std::cout << "[2] Hyper-V Host Compute (vmcompute):  "
+            std::cout << "[3] Hyper-V Host Compute (vmcompute):  "
                       << (report.vmcompute_installed ? (report.vmcompute_running ? "✓ Running" : "⚠ Installed (Stopped)") : "✗ NOT Installed") << "\n";
 
-            std::cout << "[3] WindowsSandbox.exe:                "
+            std::cout << "[4] WindowsSandbox.exe:                "
                       << (report.sandbox_exe_found ? ("✓ Found (" + report.sandbox_exe_path + ")") : "✗ Missing") << "\n";
 
             if (report.is_ready()) {
@@ -125,8 +128,18 @@ int main(int argc, char* argv[]) {
                 return 0;
             } else {
                 std::cout << "\nStatus: Windows Sandbox is NOT ready.\n\n"
-                          << "Root Cause of 0x80040154 (REGDB_E_CLASSNOTREG):\n";
-                if (!report.vmcompute_installed) {
+                          << "Diagnostic Findings:\n";
+                if (report.is_windows_home) {
+                    std::cout << "  -> You are running Windows 11 Home edition.\n"
+                              << "     Microsoft officially limits Windows Sandbox to Pro/Enterprise editions,\n"
+                              << "     which is why 'Feature name Containers-DisposableClientVM is unknown'.\n\n"
+                              << "Recommended Alternatives:\n"
+                              << "  * Use Winmetic Tier 1 & 2 ('winmetic run')! Virtual Seam and Hidden Desktop\n"
+                              << "    work natively on Windows 11 Home with zero Hyper-V or Pro requirements.\n\n"
+                              << "  * If you specifically need Windows Sandbox on Home, run:\n"
+                              << "    winmetic sandbox setup --home\n"
+                              << "    (which stages the servicing container packages via DISM).\n";
+                } else if (!report.vmcompute_installed) {
                     std::cout << "  -> The Hyper-V Host Compute Service ('vmcompute') is not installed.\n"
                               << "     Windows Sandbox requires the 'Containers-DisposableClientVM' optional feature.\n\n"
                               << "Resolution:\n"
@@ -139,12 +152,26 @@ int main(int argc, char* argv[]) {
         }
 
         if (argc >= 3 && std::string(argv[2]) == "setup") {
-            std::cout << "[winmetic] Requesting administrator privileges to install Windows Sandbox feature...\n";
+            bool for_home = (argc >= 4 && std::string(argv[3]) == "--home");
+            std::cout << "[winmetic] Requesting administrator privileges to install Windows Sandbox feature"
+                      << (for_home ? " (Windows Home Mode)..." : "...") << "\n";
+
+            std::wstring ps_cmd;
+            if (for_home) {
+                ps_cmd = L"-NoExit -Command \"Write-Host 'Staging Container packages on Windows Home via DISM...' -ForegroundColor Yellow; "
+                         L"Get-ChildItem -Path $env:SystemRoot\\servicing\\Packages\\*Containers*.mum | ForEach-Object { & dism.exe /online /norestart /add-package:$($_.FullName) }; "
+                         L"& dism.exe /online /enable-feature /featurename:Containers-DisposableClientVM /LimitAccess /ALL; "
+                         L"Write-Host 'Installation finished! Please restart your PC.' -ForegroundColor Green\"";
+            } else {
+                ps_cmd = L"-NoExit -Command \"Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All; "
+                         L"Write-Host 'Installation finished. Please restart your PC if prompted.' -ForegroundColor Cyan\"";
+            }
+
             HINSTANCE res = ShellExecuteW(
                 nullptr,
                 L"runas",
                 L"powershell.exe",
-                L"-NoExit -Command \"Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All; Write-Host 'Installation finished. Please restart your PC if prompted.' -ForegroundColor Cyan\"",
+                ps_cmd.c_str(),
                 nullptr,
                 SW_SHOWNORMAL
             );

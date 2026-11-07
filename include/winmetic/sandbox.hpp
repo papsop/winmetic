@@ -78,6 +78,8 @@ struct SandboxConfig {
  * @brief Diagnostic check result for Windows Sandbox readiness.
  */
 struct SandboxDoctorResult {
+    bool is_windows_home = false;
+    std::string windows_edition;
     bool virtualization_firmware_enabled = false;
     bool vmcompute_installed = false;
     bool vmcompute_running = false;
@@ -85,7 +87,7 @@ struct SandboxDoctorResult {
     std::string sandbox_exe_path;
 
     [[nodiscard]] bool is_ready() const noexcept {
-        return virtualization_firmware_enabled && vmcompute_installed && sandbox_exe_found;
+        return !is_windows_home && virtualization_firmware_enabled && vmcompute_installed && sandbox_exe_found;
     }
 };
 
@@ -95,6 +97,23 @@ struct SandboxDoctorResult {
  */
 inline SandboxDoctorResult check_sandbox_readiness() {
     SandboxDoctorResult res;
+
+    // 0. Check Windows Edition
+    HKEY hkey;
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion", 0, KEY_READ, &hkey) == ERROR_SUCCESS) {
+        wchar_t prod_name[256]{};
+        DWORD size = sizeof(prod_name);
+        if (RegQueryValueExW(hkey, L"ProductName", nullptr, nullptr, reinterpret_cast<LPBYTE>(prod_name), &size) == ERROR_SUCCESS) {
+            std::wstring wname(prod_name);
+            int len = WideCharToMultiByte(CP_UTF8, 0, wname.data(), static_cast<int>(wname.size()), nullptr, 0, nullptr, nullptr);
+            res.windows_edition.assign(len, 0);
+            WideCharToMultiByte(CP_UTF8, 0, wname.data(), static_cast<int>(wname.size()), res.windows_edition.data(), len, nullptr, nullptr);
+            if (wname.find(L"Home") != std::wstring::npos) {
+                res.is_windows_home = true;
+            }
+        }
+        RegCloseKey(hkey);
+    }
 
     // 1. Check BIOS / Hardware Virtualization
     res.virtualization_firmware_enabled = IsProcessorFeaturePresent(PF_VIRT_FIRMWARE_ENABLED) != 0;
