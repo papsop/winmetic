@@ -8,18 +8,25 @@ if (MSVC)
     add_compile_options(/W4 /permissive- /utf-8)
 endif()
 
-# Core Library (Header-only / Interface target)
-add_library(winmetic INTERFACE)
-target_include_directories(winmetic INTERFACE
+# Core Library (Static library)
+add_library(winmetic STATIC
+    src/driver.cpp
+)
+target_include_directories(winmetic PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-target_link_libraries(winmetic INTERFACE
+target_link_libraries(winmetic PUBLIC
     user32
+    gdi32
+    ole32
+    oleaut32
+    shell32
+    dwmapi
+    shcore
     d3d11
     dxgi
     windowscodecs
-    shell32
 )
 
 # CLI Tool

@@ -108,8 +108,8 @@ private:
     }
 
     void init_wic() {
-        HRESULT hr = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        (void)hr; // S_FALSE or S_OK are both fine
+        HRESULT hr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+        (void)hr; // S_FALSE or S_OK or RPC_E_CHANGED_MODE are all fine
 
         hr = CoCreateInstance(
             CLSID_WICImagingFactory,
