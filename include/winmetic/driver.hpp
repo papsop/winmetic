@@ -37,6 +37,7 @@ bool is_hermetic_mode() noexcept;
 
 void set_watch_mode(bool enabled) noexcept;
 bool is_watch_mode() noexcept;
+void set_record_frames_dir(std::string_view dir) noexcept;
 void update_watch_viewer(HWND target_hwnd, std::wstring_view status_label);
 HWND watch_viewer_hwnd() noexcept;
 

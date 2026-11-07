@@ -12,6 +12,14 @@ Hermetic, zero-interference GUI test runner, virtual platform seam, and Windows 
 
 </div>
 
+<div align="center">
+
+![Winmetic Live Preview Demo](assets/demo.gif)
+
+*Winmetic Hermetic Live Preview running button clicks, smooth slider dragging, mouse wheeling, and Unicode typing on a hidden background window with zero physical cursor movement and zero focus theft.*
+
+</div>
+
 ---
 
 ## Why Winmetic?

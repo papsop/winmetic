@@ -35,11 +35,15 @@ namespace winmetic
 using Microsoft::WRL::ComPtr;
 namespace fs = std::filesystem;
 
+static bool encode_dib_to_png(const fs::path& png, int w, int h, BYTE* bits);
+
 namespace
 {
 
 DriverMode g_driver_mode = DriverMode::Physical;
 bool g_watch_mode = false;
+std::string g_record_frames_dir;
+uint32_t g_record_frame_index = 0;
 uint32_t g_hermetic_mouse_buttons = 0;
 HWND g_hermetic_current_hwnd = nullptr;
 
@@ -106,6 +110,7 @@ private:
 
   void ensure_window();
   static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp);
+  void save_current_frame();
 
   HWND viewer_hwnd_ = nullptr;
   HWND last_target_hwnd_ = nullptr;
@@ -501,6 +506,11 @@ void HermeticWatchViewer::update(HWND target_hwnd, std::wstring_view status_labe
   InvalidateRect(viewer_hwnd_, nullptr, FALSE);
   UpdateWindow(viewer_hwnd_);
 
+  if (!g_record_frames_dir.empty())
+  {
+    save_current_frame();
+  }
+
   // Pause per visual step while pumping viewer messages so human can watch
   // If WINMETIC_WATCH_NO_HOLD=1 or ATLAS_WATCH_NO_HOLD=1, use 1ms deadline for automated fast runs
   const bool no_hold = get_env_flag("WINMETIC_WATCH_NO_HOLD", "ATLAS_WATCH_NO_HOLD");
@@ -519,7 +529,57 @@ void HermeticWatchViewer::update(HWND target_hwnd, std::wstring_view status_labe
   }
 }
 
+void HermeticWatchViewer::save_current_frame()
+{
+  if (!cache_dc_ || cache_w_ <= 0 || cache_h_ <= 0 || g_record_frames_dir.empty())
+    return;
+
+  HDC mem = CreateCompatibleDC(cache_dc_);
+  if (!mem)
+    return;
+
+  BITMAPINFO bmi{};
+  bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+  bmi.bmiHeader.biWidth = cache_w_;
+  bmi.bmiHeader.biHeight = -cache_h_; // top-down
+  bmi.bmiHeader.biPlanes = 1;
+  bmi.bmiHeader.biBitCount = 32;
+  bmi.bmiHeader.biCompression = BI_RGB;
+  void* bits = nullptr;
+  HBITMAP bitmap = CreateDIBSection(mem, &bmi, DIB_RGB_COLORS, &bits, nullptr, 0);
+  if (bitmap && bits)
+  {
+    HGDIOBJ old = SelectObject(mem, bitmap);
+    BitBlt(mem, 0, 0, cache_w_, cache_h_, cache_dc_, 0, 0, SRCCOPY);
+
+    char frame_name[64];
+    snprintf(frame_name, sizeof(frame_name), "frame_%04u.png", ++g_record_frame_index);
+    fs::path frame_path = fs::path(g_record_frames_dir) / frame_name;
+
+    auto* pixels = static_cast<BYTE*>(bits);
+    for (size_t i = 3; i < static_cast<size_t>(cache_w_) * cache_h_ * 4; i += 4)
+      pixels[i] = 0xFF;
+
+    encode_dib_to_png(frame_path, cache_w_, cache_h_, pixels);
+
+    SelectObject(mem, old);
+    DeleteObject(bitmap);
+  }
+  DeleteDC(mem);
+}
+
 } // namespace
+
+void set_record_frames_dir(std::string_view dir) noexcept
+{
+  g_record_frames_dir = std::string(dir);
+  if (!g_record_frames_dir.empty())
+  {
+    std::error_code ec;
+    fs::create_directories(g_record_frames_dir, ec);
+    set_watch_mode(true);
+  }
+}
 
 void set_fatal_handler(FailureHandler fn) noexcept
 {
@@ -1959,7 +2019,7 @@ bool screenshot_unchecked(HWND hwnd, const fs::path& png)
   return capture_rect(rc, png);
 }
 
-static bool encode_dib_to_png(const fs::path& png, int w, int h, BYTE* bits)
+bool encode_dib_to_png(const fs::path& png, int w, int h, BYTE* bits)
 {
   bool ok = false;
   const HRESULT init = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);

@@ -245,11 +245,23 @@ struct DemoCanvasWindow {
     }
 };
 
-int run_demo() {
+int run_demo(int argc, char* argv[]) {
+    std::string record_dir;
+    for (int i = 2; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--record-dir" && i + 1 < argc) {
+            record_dir = argv[++i];
+        }
+    }
+
     std::cout << "=== Winmetic Hermetic UX Interactive Demo ===\n"
               << "[winmetic] Creating hidden WS_EX_NOACTIVATE demo window at (-16000, -16000)...\n"
-              << "[winmetic] Activating Hermetic Watch Preview Mode (Zero Focus Theft, Zero Mouse Hijacking)...\n"
-              << "[winmetic] Watch the 'Atlas Hermetic Live Preview' window animate live on your screen!\n\n";
+              << "[winmetic] Activating Hermetic Watch Preview Mode (Zero Focus Theft, Zero Mouse Hijacking)...\n";
+    if (!record_dir.empty()) {
+        std::cout << "[winmetic] Recording frames to: " << record_dir << "\n";
+        winmetic::set_record_frames_dir(record_dir);
+    }
+    std::cout << "[winmetic] Watch the 'Atlas Hermetic Live Preview' window animate live on your screen!\n\n";
 
     DemoCanvasWindow demo;
     if (!demo.hwnd) {
@@ -323,7 +335,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (command == "demo") {
-        return run_demo();
+        return run_demo(argc, argv);
     }
 
     if (command == "run") {
