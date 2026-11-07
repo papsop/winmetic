@@ -75,6 +75,60 @@ struct SandboxConfig {
 };
 
 /**
+ * @brief Diagnostic check result for Windows Sandbox readiness.
+ */
+struct SandboxDoctorResult {
+    bool virtualization_firmware_enabled = false;
+    bool vmcompute_installed = false;
+    bool vmcompute_running = false;
+    bool sandbox_exe_found = false;
+    std::string sandbox_exe_path;
+
+    [[nodiscard]] bool is_ready() const noexcept {
+        return virtualization_firmware_enabled && vmcompute_installed && sandbox_exe_found;
+    }
+};
+
+/**
+ * @brief Diagnoses the local environment to prevent REGDB_E_CLASSNOTREG (0x80040154)
+ * and other common Sandbox initialization crashes.
+ */
+inline SandboxDoctorResult check_sandbox_readiness() {
+    SandboxDoctorResult res;
+
+    // 1. Check BIOS / Hardware Virtualization
+    res.virtualization_firmware_enabled = IsProcessorFeaturePresent(PF_VIRT_FIRMWARE_ENABLED) != 0;
+
+    // 2. Check Hyper-V Host Compute Service (vmcompute)
+    SC_HANDLE scm = OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT);
+    if (scm) {
+        SC_HANDLE svc = OpenServiceW(scm, L"vmcompute", SERVICE_QUERY_STATUS);
+        if (svc) {
+            res.vmcompute_installed = true;
+            SERVICE_STATUS_PROCESS ssp{};
+            DWORD bytes_needed = 0;
+            if (QueryServiceStatusEx(svc, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&ssp), sizeof(ssp), &bytes_needed)) {
+                res.vmcompute_running = (ssp.dwCurrentState == SERVICE_RUNNING);
+            }
+            CloseServiceHandle(svc);
+        }
+        CloseServiceHandle(scm);
+    }
+
+    // 3. Check WindowsSandbox.exe presence
+    wchar_t sys_dir[MAX_PATH];
+    if (GetSystemDirectoryW(sys_dir, MAX_PATH) > 0) {
+        std::filesystem::path exe_path = std::filesystem::path(sys_dir) / "WindowsSandbox.exe";
+        if (std::filesystem::exists(exe_path)) {
+            res.sandbox_exe_found = true;
+            res.sandbox_exe_path = exe_path.string();
+        }
+    }
+
+    return res;
+}
+
+/**
  * @brief Launches a .wsb file using the Windows Sandbox executable.
  */
 inline bool launch_sandbox(const std::filesystem::path& wsb_path) {

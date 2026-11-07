@@ -19,6 +19,7 @@ target_link_libraries(winmetic INTERFACE
     d3d11
     dxgi
     windowscodecs
+    shell32
 )
 
 # CLI Tool

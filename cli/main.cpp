@@ -1,4 +1,5 @@
 #include <winmetic/winmetic.hpp>
+#include <shellapi.h>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -17,6 +18,8 @@ void print_help() {
               << "Hermetic, zero-interference GUI test runner & Windows Sandbox orchestrator.\n\n"
               << "Usage:\n"
               << "  winmetic run <executable> [args...]       Run an application on an isolated hidden desktop\n"
+              << "  winmetic sandbox doctor                   Diagnose Windows Sandbox environment readiness\n"
+              << "  winmetic sandbox setup                    Install missing Windows Sandbox optional features\n"
               << "  winmetic sandbox gen --map <host_dir>     Generate a disposable .wsb sandbox profile\n"
               << "  winmetic sandbox launch <profile.wsb>     Launch Windows Sandbox with specified profile\n"
               << "  winmetic --version                        Show version information\n"
@@ -104,6 +107,56 @@ int main(int argc, char* argv[]) {
     }
 
     if (command == "sandbox") {
+        if (argc >= 3 && std::string(argv[2]) == "doctor") {
+            std::cout << "=== Winmetic Sandbox Doctor ===\n";
+            auto report = winmetic::check_sandbox_readiness();
+
+            std::cout << "[1] Hardware Virtualization (BIOS):    "
+                      << (report.virtualization_firmware_enabled ? "✓ Enabled" : "✗ Disabled in BIOS/UEFI") << "\n";
+
+            std::cout << "[2] Hyper-V Host Compute (vmcompute):  "
+                      << (report.vmcompute_installed ? (report.vmcompute_running ? "✓ Running" : "⚠ Installed (Stopped)") : "✗ NOT Installed") << "\n";
+
+            std::cout << "[3] WindowsSandbox.exe:                "
+                      << (report.sandbox_exe_found ? ("✓ Found (" + report.sandbox_exe_path + ")") : "✗ Missing") << "\n";
+
+            if (report.is_ready()) {
+                std::cout << "\nStatus: Windows Sandbox is ready for container testing!\n";
+                return 0;
+            } else {
+                std::cout << "\nStatus: Windows Sandbox is NOT ready.\n\n"
+                          << "Root Cause of 0x80040154 (REGDB_E_CLASSNOTREG):\n";
+                if (!report.vmcompute_installed) {
+                    std::cout << "  -> The Hyper-V Host Compute Service ('vmcompute') is not installed.\n"
+                              << "     Windows Sandbox requires the 'Containers-DisposableClientVM' optional feature.\n\n"
+                              << "Resolution:\n"
+                              << "  Run 'winmetic sandbox setup' (prompts for Admin) or run in an Admin PowerShell:\n"
+                              << "  Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All\n"
+                              << "  (A system reboot is required after installation).\n";
+                }
+                return 1;
+            }
+        }
+
+        if (argc >= 3 && std::string(argv[2]) == "setup") {
+            std::cout << "[winmetic] Requesting administrator privileges to install Windows Sandbox feature...\n";
+            HINSTANCE res = ShellExecuteW(
+                nullptr,
+                L"runas",
+                L"powershell.exe",
+                L"-NoExit -Command \"Enable-WindowsOptionalFeature -Online -FeatureName Containers-DisposableClientVM -All; Write-Host 'Installation finished. Please restart your PC if prompted.' -ForegroundColor Cyan\"",
+                nullptr,
+                SW_SHOWNORMAL
+            );
+            if (reinterpret_cast<INT_PTR>(res) > 32) {
+                std::cout << "[winmetic] Installation script launched with elevation.\n";
+                return 0;
+            } else {
+                std::cerr << "[winmetic] Failed to elevate: User cancelled UAC prompt.\n";
+                return 1;
+            }
+        }
+
         if (argc >= 3 && std::string(argv[2]) == "gen") {
             std::string host_dir = ".";
             std::string out_path = "winmetic-sandbox.wsb";
@@ -136,6 +189,14 @@ int main(int argc, char* argv[]) {
 
         if (argc >= 4 && std::string(argv[2]) == "launch") {
             std::string wsb_file = argv[3];
+
+            auto report = winmetic::check_sandbox_readiness();
+            if (!report.is_ready()) {
+                std::cerr << "[winmetic] Warning: Windows Sandbox environment is not fully configured!\n"
+                          << "          Running now may trigger 0x80040154 (REGDB_E_CLASSNOTREG).\n"
+                          << "          Run 'winmetic sandbox doctor' to diagnose or 'winmetic sandbox setup' to install.\n\n";
+            }
+
             std::cout << "[winmetic] Launching Windows Sandbox with profile: " << wsb_file << "...\n";
             if (winmetic::launch_sandbox(wsb_file)) {
                 return 0;
