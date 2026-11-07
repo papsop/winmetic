@@ -25,6 +25,8 @@
 namespace winmetic
 {
 
+// Default is Hermetic (no physical input). Choose Physical explicitly via set_driver_mode()
+// or by setting WINMETIC_PHYSICAL=1.
 enum class DriverMode
 {
   Physical,

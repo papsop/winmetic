@@ -40,7 +40,10 @@ static bool encode_dib_to_png(const fs::path& png, int w, int h, BYTE* bits);
 namespace
 {
 
-DriverMode g_driver_mode = DriverMode::Physical;
+// Hermetic (no physical input) is the default. Physical input is opt-in, either by calling
+// set_driver_mode(DriverMode::Physical) or by setting WINMETIC_PHYSICAL=1.
+DriverMode g_driver_mode = DriverMode::Hermetic;
+bool g_driver_mode_explicit = false;
 bool g_watch_mode = false;
 std::string g_record_frames_dir;
 uint32_t g_record_frame_index = 0;
@@ -594,6 +597,7 @@ void set_check_fail_handler(FailureHandler fn) noexcept
 void set_driver_mode(DriverMode mode) noexcept
 {
   g_driver_mode = mode;
+  g_driver_mode_explicit = true;
   global_platform_seam().hermetic = (mode == DriverMode::Hermetic);
 }
 
@@ -632,7 +636,11 @@ HWND watch_viewer_hwnd() noexcept
 bool is_hermetic_mode() noexcept
 {
   if (g_driver_mode == DriverMode::Hermetic)
-    return true;
+  {
+    // Default (never explicitly set): hermetic unless the user opted in to physical input.
+    if (g_driver_mode_explicit || !get_env_flag("WINMETIC_PHYSICAL"))
+      return true;
+  }
   if (g_watch_mode)
     return true;
   if (gaming_safe_mode_active())
