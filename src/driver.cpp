@@ -134,7 +134,7 @@ void HermeticWatchViewer::ensure_window()
     wc.cbSize = sizeof(WNDCLASSEXW);
     wc.lpfnWndProc = &HermeticWatchViewer::wnd_proc;
     wc.hInstance = GetModuleHandleW(nullptr);
-    wc.lpszClassName = L"AtlasHermeticWatchWindow";
+    wc.lpszClassName = L"WinmeticHermeticWatchWindow";
     wc.hCursor = LoadCursorW(nullptr, MAKEINTRESOURCEW(32512));
     wc.hbrBackground = static_cast<HBRUSH>(GetStockObject(BLACK_BRUSH));
     RegisterClassExW(&wc);
@@ -146,8 +146,8 @@ void HermeticWatchViewer::ensure_window()
   const int win_w = wr.right - wr.left;
   const int win_h = wr.bottom - wr.top;
 
-  viewer_hwnd_ = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE, L"AtlasHermeticWatchWindow",
-                                 L"Atlas Hermetic Live Preview \u2014 Virtual Input Monitor (Zero Focus Theft)",
+  viewer_hwnd_ = CreateWindowExW(WS_EX_TOPMOST | WS_EX_NOACTIVATE, L"WinmeticHermeticWatchWindow",
+                                 L"Winmetic Hermetic Live Preview \u2014 Virtual Input Monitor (Zero Focus Theft)",
                                  WS_OVERLAPPEDWINDOW, 80, 60, win_w, win_h, nullptr, nullptr,
                                  GetModuleHandleW(nullptr), nullptr);
 

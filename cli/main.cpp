@@ -261,7 +261,7 @@ int run_demo(int argc, char* argv[]) {
         std::cout << "[winmetic] Recording frames to: " << record_dir << "\n";
         winmetic::set_record_frames_dir(record_dir);
     }
-    std::cout << "[winmetic] Watch the 'Atlas Hermetic Live Preview' window animate live on your screen!\n\n";
+    std::cout << "[winmetic] Watch the 'Winmetic Hermetic Live Preview' window animate live on your screen!\n\n";
 
     DemoCanvasWindow demo;
     if (!demo.hwnd) {
@@ -370,10 +370,10 @@ int main(int argc, char* argv[]) {
         std::string exe_path = argv[exe_idx];
 
         // Set hermetic environment variables for child process
-        SetEnvironmentVariableA("ATLAS_HERMETIC_UX", "1");
+        SetEnvironmentVariableA("WINMETIC_HERMETIC_UX", "1");
         SetEnvironmentVariableA("WINMETIC_HERMETIC_UX", "1");
         if (watch_mode) {
-            SetEnvironmentVariableA("ATLAS_WATCH_UX", "1");
+            SetEnvironmentVariableA("WINMETIC_WATCH_UX", "1");
             SetEnvironmentVariableA("WINMETIC_WATCH_UX", "1");
             std::cout << "[winmetic] Enabling watch preview mode...\n";
         }
@@ -389,7 +389,7 @@ int main(int argc, char* argv[]) {
         STARTUPINFOA si{};
         si.cb = sizeof(si);
         if (hidden_desktop) {
-            si.lpDesktop = const_cast<LPSTR>("WinSta0\\AtlasTestDesktop");
+            si.lpDesktop = const_cast<LPSTR>("WinSta0\\WinmeticTestDesktop");
         }
 
         PROCESS_INFORMATION pi{};
@@ -502,21 +502,25 @@ int main(int argc, char* argv[]) {
         if (argc >= 3 && std::string(argv[2]) == "gen") {
             std::string host_dir = ".";
             std::string out_path = "winmetic-sandbox.wsb";
+            bool allow_network = false; // secure default: no networking
+            bool writable = false;      // secure default: read-only host mapping
 
             for (int i = 3; i < argc; ++i) {
                 std::string arg = argv[i];
                 if (arg == "--map" && i + 1 < argc) host_dir = argv[++i];
                 if (arg == "--out" && i + 1 < argc) out_path = argv[++i];
+                if (arg == "--network") allow_network = true;
+                if (arg == "--writable") writable = true;
             }
 
             winmetic::SandboxConfig cfg;
             cfg.vgpu = winmetic::SandboxToggle::Enable;
-            cfg.networking = winmetic::SandboxToggle::Enable;
+            cfg.networking = allow_network ? winmetic::SandboxToggle::Enable : winmetic::SandboxToggle::Disable;
             cfg.memory_in_mb = 8192;
             cfg.mapped_folders.push_back({
                 .host_folder = std::filesystem::absolute(host_dir).string(),
                 .sandbox_folder = "C:\\work",
-                .read_only = false
+                .read_only = !writable
             });
             cfg.logon_command = "powershell.exe -NoExit -Command \"Set-Location C:\\work; Write-Host 'Winmetic Isolated Sandbox Ready' -ForegroundColor Green\"";
 

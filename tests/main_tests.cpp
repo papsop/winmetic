@@ -447,12 +447,10 @@ void test_watch_mode_preview_window()
       winmetic::set_watch_mode(watch);
       winmetic::set_driver_mode(mode);
       SetEnvironmentVariableA("WINMETIC_WATCH_NO_HOLD", nullptr);
-      SetEnvironmentVariableA("ATLAS_WATCH_NO_HOLD", nullptr);
     }
   } guard{prev_watch, prev_mode};
 
   SetEnvironmentVariableA("WINMETIC_WATCH_NO_HOLD", "1");
-  SetEnvironmentVariableA("ATLAS_WATCH_NO_HOLD", "1");
   winmetic::set_watch_mode(true);
   CHECK(winmetic::is_watch_mode());
   CHECK(winmetic::is_hermetic_mode());
@@ -485,7 +483,7 @@ void test_watch_mode_preview_window()
 
   wchar_t title[128]{};
   GetWindowTextW(viewer, title, 128);
-  CHECK(std::wstring(title).find(L"Atlas Hermetic Live Preview") != std::wstring::npos);
+  CHECK(std::wstring(title).find(L"Winmetic Hermetic Live Preview") != std::wstring::npos);
 
   // Viewer window must NEVER steal foreground focus
   CHECK(GetForegroundWindow() == fg_before);
