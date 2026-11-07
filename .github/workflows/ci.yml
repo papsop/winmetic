@@ -1,0 +1,23 @@
+name: Winmetic CI
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure CMake
+      run: cmake -B build -S .
+
+    - name: Build Winmetic
+      run: cmake --build build --config Release
+
+    - name: Run Test Suite
+      run: ./build/Release/winmetic_tests.exe
